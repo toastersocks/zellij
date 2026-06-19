@@ -22,8 +22,8 @@ jobs:
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('custom-main-{0}', github.run_number) || github.ref_name }}
           release_name: ${{ github.event_name == 'workflow_dispatch' && format('Custom main {0}', github.run_number) || format('Release {0}', github.ref_name) }}
-          draft: ${{ github.event_name == 'workflow_dispatch' }}
-          prerelease: false
+          draft: false
+          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
 
   build-release-normal:
     needs: create-release
