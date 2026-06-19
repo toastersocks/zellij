@@ -5,6 +5,9 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   create-release:
     runs-on: ubuntu-latest
@@ -17,8 +20,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && '' || github.ref }}
-          release_name: Release ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('custom-main-{0}', github.run_number) || github.ref_name }}
+          release_name: ${{ github.event_name == 'workflow_dispatch' && format('Custom main {0}', github.run_number) || format('Release {0}', github.ref_name) }}
           draft: ${{ github.event_name == 'workflow_dispatch' }}
           prerelease: false
 
@@ -413,4 +416,3 @@ jobs:
           asset_path: ${{ steps.make-checksum-msi.outputs.checksum_name }}
           asset_name: zellij-no-web-${{ matrix.target }}-installer.sha256sum
           asset_content_type: text/plain
-
