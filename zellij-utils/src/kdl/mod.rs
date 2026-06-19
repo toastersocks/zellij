@@ -58,6 +58,8 @@ macro_rules! parse_kdl_action_arguments {
                 "PageScrollDown" => Ok(Action::PageScrollDown),
                 "HalfPageScrollUp" => Ok(Action::HalfPageScrollUp),
                 "HalfPageScrollDown" => Ok(Action::HalfPageScrollDown),
+                "JumpToPreviousPrompt" => Ok(Action::JumpToPreviousPrompt),
+                "JumpToNextPrompt" => Ok(Action::JumpToNextPrompt),
                 "ToggleFocusFullscreen" => Ok(Action::ToggleFocusFullscreen),
                 "TogglePaneFrames" => Ok(Action::TogglePaneFrames),
                 "ToggleActiveSyncTab" => Ok(Action::ToggleActiveSyncTab),
@@ -730,6 +732,8 @@ impl Action {
             Action::PageScrollDown => Some(KdlNode::new("PageScrollDown")),
             Action::HalfPageScrollUp => Some(KdlNode::new("HalfPageScrollUp")),
             Action::HalfPageScrollDown => Some(KdlNode::new("HalfPageScrollDown")),
+            Action::JumpToPreviousPrompt => Some(KdlNode::new("JumpToPreviousPrompt")),
+            Action::JumpToNextPrompt => Some(KdlNode::new("JumpToNextPrompt")),
             Action::ToggleFocusFullscreen => Some(KdlNode::new("ToggleFocusFullscreen")),
             Action::TogglePaneFrames => Some(KdlNode::new("TogglePaneFrames")),
             Action::ToggleActiveSyncTab => Some(KdlNode::new("ToggleActiveSyncTab")),
@@ -1536,6 +1540,12 @@ impl TryFrom<(&KdlNode, &Options)> for Action {
                 parse_kdl_action_arguments!(action_name, action_arguments, kdl_action)
             },
             "HalfPageScrollDown" => {
+                parse_kdl_action_arguments!(action_name, action_arguments, kdl_action)
+            },
+            "JumpToPreviousPrompt" => {
+                parse_kdl_action_arguments!(action_name, action_arguments, kdl_action)
+            },
+            "JumpToNextPrompt" => {
                 parse_kdl_action_arguments!(action_name, action_arguments, kdl_action)
             },
             "ToggleFocusFullscreen" => {

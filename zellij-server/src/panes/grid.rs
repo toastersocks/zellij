@@ -643,6 +643,7 @@ pub struct Grid {
     pub search_results: SearchResult,
     pub pending_clipboard_update: Option<String>,
     pub pending_osc7_cwd: Option<std::path::PathBuf>,
+    prompt_markers: BTreeSet<usize>,
     /// Pending desktop notifications: (payload, terminator)
     /// Payload is the semicolon-joined params after "99", terminator is "\x07" or "\x1b\\"
     pub pending_desktop_notifications: Vec<(String, String)>,
@@ -969,6 +970,7 @@ impl Grid {
             sixel_grid,
             pending_clipboard_update: None,
             pending_osc7_cwd: None,
+            prompt_markers: BTreeSet::new(),
             pending_desktop_notifications: Vec::new(),
             pending_forwarded_queries: Vec::new(),
             ui_component_bytes: None,
@@ -1721,6 +1723,54 @@ impl Grid {
         }
         self.output_buffer.update_all_lines();
     }
+    fn mark_prompt_start(&mut self) {
+        if self.alternate_screen_state.is_some() {
+            return;
+        }
+        self.prompt_markers
+            .insert(self.scrollback_buffer_lines + self.cursor.y);
+    }
+    fn prune_prompt_markers(&mut self) {
+        let total_display_rows =
+            self.scrollback_buffer_lines + self.viewport.len() + self.lines_below.len();
+        self.prompt_markers
+            .retain(|marker| *marker < total_display_rows);
+    }
+    pub fn jump_to_previous_prompt(&mut self) -> bool {
+        if self.alternate_screen_state.is_some() {
+            return false;
+        }
+        self.prune_prompt_markers();
+        let current_top = self.scrollback_buffer_lines;
+        let Some(target) = self
+            .prompt_markers
+            .range(..current_top)
+            .next_back()
+            .copied()
+        else {
+            return false;
+        };
+        self.move_viewport_up(current_top.saturating_sub(target));
+        true
+    }
+    pub fn jump_to_next_prompt(&mut self) -> bool {
+        if self.alternate_screen_state.is_some() {
+            return false;
+        }
+        self.prune_prompt_markers();
+        let current_top = self.scrollback_buffer_lines;
+        let next_marker_start = current_top.saturating_add(1);
+        let Some(target) = self
+            .prompt_markers
+            .range(next_marker_start..)
+            .next()
+            .copied()
+        else {
+            return false;
+        };
+        self.move_viewport_down(target.saturating_sub(current_top));
+        true
+    }
     pub fn reset_viewport(&mut self) {
         let max_lines_to_scroll = *SCROLL_BUFFER_SIZE.get().unwrap() * 2; // while not very elegant, this can prevent minor bugs from becoming showstoppers by sticking the whole app display in an endless loop
         let mut lines_scrolled = 0;
@@ -2270,6 +2320,7 @@ impl Grid {
         self.output_buffer.update_all_lines();
         self.changed_colors = None;
         self.scrollback_buffer_lines = 0;
+        self.prompt_markers.clear();
         self.search_results = Default::default();
         self.sixel_scrolling = false;
         self.mouse_mode = MouseMode::NoEncoding;
@@ -3553,6 +3604,16 @@ impl Perform for Grid {
                     if let Some(path) = parse_osc7_path(raw) {
                         self.pending_osc7_cwd = Some(path);
                     }
+                }
+            },
+
+            // Shell integration prompt start marker.
+            b"133" => {
+                if params
+                    .get(1)
+                    .is_some_and(|command| command.starts_with(b"A"))
+                {
+                    self.mark_prompt_start();
                 }
             },
 

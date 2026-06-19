@@ -305,6 +305,12 @@ pub trait Pane {
     fn scroll_down(&mut self, count: usize, client_id: ClientId);
     fn scroll_left(&mut self, _count: usize, _client_id: ClientId) {}
     fn scroll_right(&mut self, _count: usize, _client_id: ClientId) {}
+    fn jump_to_previous_prompt(&mut self, _client_id: ClientId) -> bool {
+        false
+    }
+    fn jump_to_next_prompt(&mut self, _client_id: ClientId) -> bool {
+        false
+    }
     fn clear_scroll(&mut self);
     fn is_scrolled(&self) -> bool;
     fn active_at(&self) -> Instant;
@@ -6134,6 +6140,23 @@ impl Tab {
             pane.scroll_down(scroll_rows, fictitious_client_id);
             if !pane.is_scrolled() {
                 if let PaneId::Terminal(raw_fd) = pane.pid() {
+                    self.process_pending_vte_events(raw_fd)?;
+                }
+            }
+        }
+        Ok(())
+    }
+    pub fn jump_to_previous_prompt(&mut self, client_id: ClientId) -> Result<()> {
+        if let Some(active_pane) = self.get_active_pane_or_floating_pane_mut(client_id) {
+            active_pane.jump_to_previous_prompt(client_id);
+        }
+        Ok(())
+    }
+    pub fn jump_to_next_prompt(&mut self, client_id: ClientId) -> Result<()> {
+        if let Some(active_pane) = self.get_active_pane_or_floating_pane_mut(client_id) {
+            active_pane.jump_to_next_prompt(client_id);
+            if !active_pane.is_scrolled() {
+                if let PaneId::Terminal(raw_fd) = active_pane.pid() {
                     self.process_pending_vte_events(raw_fd)?;
                 }
             }

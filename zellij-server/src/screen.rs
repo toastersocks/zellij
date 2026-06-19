@@ -425,6 +425,8 @@ pub enum ScreenInstruction {
     PageScrollDown(ClientId, Option<NotificationEnd>),
     HalfPageScrollUp(ClientId, Option<NotificationEnd>),
     HalfPageScrollDown(ClientId, Option<NotificationEnd>),
+    JumpToPreviousPrompt(ClientId, Option<NotificationEnd>),
+    JumpToNextPrompt(ClientId, Option<NotificationEnd>),
     ClearScroll(ClientId),
     CloseFocusedPane(ClientId, Option<NotificationEnd>),
     ToggleActiveTerminalFullscreen(ClientId, Option<NotificationEnd>),
@@ -977,6 +979,8 @@ impl From<&ScreenInstruction> for ScreenContext {
             ScreenInstruction::PageScrollDown(..) => ScreenContext::PageScrollDown,
             ScreenInstruction::HalfPageScrollUp(..) => ScreenContext::HalfPageScrollUp,
             ScreenInstruction::HalfPageScrollDown(..) => ScreenContext::HalfPageScrollDown,
+            ScreenInstruction::JumpToPreviousPrompt(..) => ScreenContext::JumpToPreviousPrompt,
+            ScreenInstruction::JumpToNextPrompt(..) => ScreenContext::JumpToNextPrompt,
             ScreenInstruction::ClearScroll(..) => ScreenContext::ClearScroll,
             ScreenInstruction::CloseFocusedPane(..) => ScreenContext::CloseFocusedPane,
             ScreenInstruction::ToggleActiveTerminalFullscreen(..) => {
@@ -7287,6 +7291,32 @@ pub(crate) fn screen_thread_main(
                     client_id,
                     |tab: &mut Tab, client_id: ClientId| tab
                         .scroll_active_terminal_down_half_page(client_id), ?
+                );
+                screen.render(None)?;
+            },
+            ScreenInstruction::JumpToPreviousPrompt(
+                client_id,
+                _completion_tx, // the action ends here, dropping this will release anything
+                                // waiting for it
+            ) => {
+                active_tab_and_connected_client_id!(
+                    screen,
+                    client_id,
+                    |tab: &mut Tab, client_id: ClientId| tab
+                        .jump_to_previous_prompt(client_id), ?
+                );
+                screen.render(None)?;
+            },
+            ScreenInstruction::JumpToNextPrompt(
+                client_id,
+                _completion_tx, // the action ends here, dropping this will release anything
+                                // waiting for it
+            ) => {
+                active_tab_and_connected_client_id!(
+                    screen,
+                    client_id,
+                    |tab: &mut Tab, client_id: ClientId| tab
+                        .jump_to_next_prompt(client_id), ?
                 );
                 screen.render(None)?;
             },

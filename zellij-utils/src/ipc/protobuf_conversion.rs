@@ -930,6 +930,8 @@ impl From<crate::input::actions::Action>
             HalfPageScrollUpAction,
             HalfPageScrollUpByPaneIdAction,
             HideFloatingPanesAction,
+            JumpToNextPromptAction,
+            JumpToPreviousPromptAction,
             KeybindPipeAction,
             LaunchOrFocusPluginAction,
             LaunchPluginAction,
@@ -1166,6 +1168,12 @@ impl From<crate::input::actions::Action>
             },
             crate::input::actions::Action::HalfPageScrollDown => {
                 ActionType::HalfPageScrollDown(HalfPageScrollDownAction {})
+            },
+            crate::input::actions::Action::JumpToPreviousPrompt => {
+                ActionType::JumpToPreviousPrompt(JumpToPreviousPromptAction {})
+            },
+            crate::input::actions::Action::JumpToNextPrompt => {
+                ActionType::JumpToNextPrompt(JumpToNextPromptAction {})
             },
             crate::input::actions::Action::ToggleFocusFullscreen => {
                 ActionType::ToggleFocusFullscreen(ToggleFocusFullscreenAction {})
@@ -2028,6 +2036,10 @@ impl TryFrom<crate::client_server_contract::client_server_contract::Action>
             ActionType::HalfPageScrollDown(_) => {
                 Ok(crate::input::actions::Action::HalfPageScrollDown)
             },
+            ActionType::JumpToPreviousPrompt(_) => {
+                Ok(crate::input::actions::Action::JumpToPreviousPrompt)
+            },
+            ActionType::JumpToNextPrompt(_) => Ok(crate::input::actions::Action::JumpToNextPrompt),
             ActionType::ToggleFocusFullscreen(_) => {
                 Ok(crate::input::actions::Action::ToggleFocusFullscreen)
             },

@@ -573,6 +573,22 @@ pub(crate) fn route_action(
                 ))
                 .with_context(err_context)?;
         },
+        Action::JumpToPreviousPrompt => {
+            senders
+                .send_to_screen(ScreenInstruction::JumpToPreviousPrompt(
+                    client_id,
+                    Some(NotificationEnd::new(completion_tx)),
+                ))
+                .with_context(err_context)?;
+        },
+        Action::JumpToNextPrompt => {
+            senders
+                .send_to_screen(ScreenInstruction::JumpToNextPrompt(
+                    client_id,
+                    Some(NotificationEnd::new(completion_tx)),
+                ))
+                .with_context(err_context)?;
+        },
         Action::ToggleFocusFullscreen => {
             senders
                 .send_to_screen(ScreenInstruction::ToggleActiveTerminalFullscreen(

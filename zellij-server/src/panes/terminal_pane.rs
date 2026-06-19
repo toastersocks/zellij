@@ -591,6 +591,20 @@ impl Pane for TerminalPane {
         self.grid.move_viewport_down(count);
         self.set_should_render(true);
     }
+    fn jump_to_previous_prompt(&mut self, _client_id: ClientId) -> bool {
+        let jumped = self.grid.jump_to_previous_prompt();
+        if jumped {
+            self.set_should_render(true);
+        }
+        jumped
+    }
+    fn jump_to_next_prompt(&mut self, _client_id: ClientId) -> bool {
+        let jumped = self.grid.jump_to_next_prompt();
+        if jumped {
+            self.set_should_render(true);
+        }
+        jumped
+    }
     fn clear_scroll(&mut self) {
         self.grid.reset_viewport();
         self.set_should_render(true);

@@ -1944,6 +1944,8 @@ impl TryFrom<Action> for ProtobufAction {
             | Action::ListTabs { .. }
             | Action::CurrentTabInfo { .. }
             | Action::SetPaneColor { .. }
+            | Action::JumpToPreviousPrompt
+            | Action::JumpToNextPrompt
             | Action::ToggleMobileMode => Err("Unsupported action"),
         }
     }

@@ -212,6 +212,10 @@ pub enum Action {
     HalfPageScrollUp,
     /// Scroll down half page in focus pane.
     HalfPageScrollDown,
+    /// Jump to the previous shell prompt marker in the focus pane.
+    JumpToPreviousPrompt,
+    /// Jump to the next shell prompt marker in the focus pane.
+    JumpToNextPrompt,
     /// Toggle between fullscreen focus pane and normal layout.
     ToggleFocusFullscreen,
     /// Toggle frames around panes in the UI

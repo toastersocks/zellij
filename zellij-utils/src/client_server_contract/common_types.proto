@@ -278,6 +278,8 @@ message Action {
     SetLightThemeAction set_light_theme = 138;
     ToggleThemeAction toggle_theme = 139;
     ToggleMobileModeAction toggle_mobile_mode = 140;
+    JumpToPreviousPromptAction jump_to_previous_prompt = 141;
+    JumpToNextPromptAction jump_to_next_prompt = 142;
   }
 }
 
@@ -303,6 +305,8 @@ message PageScrollUpAction {}
 message PageScrollDownAction {}
 message HalfPageScrollUpAction {}
 message HalfPageScrollDownAction {}
+message JumpToPreviousPromptAction {}
+message JumpToNextPromptAction {}
 message ToggleFocusFullscreenAction {}
 message TogglePaneFramesAction {}
 message ToggleActiveSyncTabAction {}
