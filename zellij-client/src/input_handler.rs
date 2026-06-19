@@ -3,8 +3,9 @@ use crate::{
     os_input_output::ClientOsApi, stdin_ansi_parser::AnsiStdinInstruction, ClientId,
     ClientInstruction, CommandIsExecuting, InputInstruction,
 };
+use std::time::Duration;
 use zellij_utils::{
-    channels::{Receiver, SenderWithContext, OPENCALLS},
+    channels::{Receiver, RecvTimeoutError, SenderWithContext, OPENCALLS},
     data::{InputMode, KeyWithModifier},
     errors::{ContextType, ErrorContext, FatalError},
     input::{
@@ -20,6 +21,8 @@ use zellij_utils::{
         InputEvent, Modifiers, MouseButtons, MouseEvent as TermwizMouseEvent,
     },
 };
+
+const SELECTION_AUTOSCROLL_INTERVAL: Duration = Duration::from_millis(16);
 
 /// Handles the dispatching of [`Action`]s according to the current
 /// [`InputMode`], and keep tracks of the current [`InputMode`].
@@ -162,11 +165,32 @@ impl InputHandler {
             self.os_input.enable_mouse().non_fatal();
             self.mouse_mode_active = true;
         }
+        let mut last_left_drag_motion = None;
         loop {
             if self.should_exit {
                 break;
             }
-            match self.receive_input_instructions.recv() {
+            let maybe_input_instruction = if last_left_drag_motion.is_some() {
+                match self
+                    .receive_input_instructions
+                    .recv_timeout(SELECTION_AUTOSCROLL_INTERVAL)
+                {
+                    Ok(input_instruction) => Ok(input_instruction),
+                    Err(RecvTimeoutError::Timeout) => {
+                        if let Some(mouse_event) = last_left_drag_motion {
+                            self.handle_mouse_event(&mouse_event);
+                        }
+                        continue;
+                    },
+                    Err(RecvTimeoutError::Disconnected) => Err(RecvTimeoutError::Disconnected),
+                }
+            } else {
+                self.receive_input_instructions
+                    .recv()
+                    .map_err(|_| RecvTimeoutError::Disconnected)
+            };
+
+            match maybe_input_instruction {
                 Ok((InputInstruction::KeyEvent(input_event, raw_bytes), _error_context)) => {
                     match input_event {
                         InputEvent::Key(key_event) => {
@@ -179,6 +203,10 @@ impl InputHandler {
                         },
                         InputEvent::Mouse(mouse_event) => {
                             let mouse_event = from_termwiz(&mut self.mouse_old_event, mouse_event);
+                            update_selection_autoscroll_event(
+                                &mut last_left_drag_motion,
+                                mouse_event,
+                            );
                             self.handle_mouse_event(&mouse_event);
                         },
                         InputEvent::Paste(pasted_text) => {
@@ -243,6 +271,7 @@ impl InputHandler {
                     self.handle_key(&key_with_modifier, raw_bytes, is_kitty);
                 },
                 Ok((InputInstruction::MouseEvent(mouse_event), _error_context)) => {
+                    update_selection_autoscroll_event(&mut last_left_drag_motion, mouse_event);
                     self.handle_mouse_event(&mouse_event);
                 },
                 Ok((
@@ -437,6 +466,17 @@ impl InputHandler {
         self.send_client_instructions
             .send(ClientInstruction::Exit(reason))
             .unwrap();
+    }
+}
+
+fn update_selection_autoscroll_event(
+    last_left_drag_motion: &mut Option<MouseEvent>,
+    mouse_event: MouseEvent,
+) {
+    if mouse_event.left && mouse_event.event_type == MouseEventType::Motion {
+        *last_left_drag_motion = Some(mouse_event);
+    } else if mouse_event.event_type != MouseEventType::Motion || !mouse_event.left {
+        *last_left_drag_motion = None;
     }
 }
 

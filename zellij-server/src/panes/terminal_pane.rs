@@ -35,6 +35,7 @@ use zellij_utils::{
 use crate::ui::pane_boundaries_frame::{FrameParams, PaneFrame};
 
 pub const SELECTION_SCROLL_INTERVAL_MS: u64 = 10;
+const MAX_SELECTION_SCROLL_LINES_PER_TICK: usize = 8;
 
 // Some keys in different formats but are used in the code
 const LEFT_ARROW: &[u8] = &[27, 91, 68];
@@ -121,6 +122,12 @@ impl std::fmt::Display for PaneId {
 
 type IsFirstRun = bool;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SelectionScrollDirection {
+    Up,
+    Down,
+}
+
 // FIXME: This should hold an os_api handle so that terminal panes can set their own size via FD in
 // their `reflow_lines()` method. Drop a Box<dyn ServerOsApi> in here somewhere.
 #[allow(clippy::too_many_arguments)]
@@ -134,6 +141,8 @@ pub struct TerminalPane {
     pub style: Style,
     vte_parser: vte::Parser,
     selection_scrolled_at: time::Instant,
+    selection_scroll_direction: Option<SelectionScrollDirection>,
+    selection_scroll_started_at: Option<time::Instant>,
     content_offset: Offset,
     pane_title: String,
     pane_name: String,
@@ -667,6 +676,7 @@ impl Pane for TerminalPane {
 
     fn start_selection(&mut self, start: &Position, _client_id: ClientId) {
         self.grid.start_selection(start);
+        self.reset_selection_scroll_acceleration();
         self.set_should_render(true);
     }
 
@@ -677,29 +687,40 @@ impl Pane for TerminalPane {
         let cursor_at_the_top = to.line.0 as usize >= self.grid.height && should_scroll;
         let cursor_in_the_middle = to.line.0 >= 0 && (to.line.0 as usize) < self.grid.height;
 
-        // TODO: check how far up/down mouse is relative to pane, to increase scroll lines?
         if cursor_at_the_bottom {
-            self.grid.scroll_up_one_line();
+            let lines_to_scroll =
+                self.selection_scroll_lines(SelectionScrollDirection::Up, to.line.0.unsigned_abs());
+            for _ in 0..lines_to_scroll {
+                self.grid.scroll_up_one_line();
+            }
             self.selection_scrolled_at = time::Instant::now();
             self.set_should_render(true);
         } else if cursor_at_the_top {
-            self.grid.scroll_down_one_line();
+            let distance_from_pane = (to.line.0 as usize).saturating_sub(self.grid.height) + 1;
+            let lines_to_scroll =
+                self.selection_scroll_lines(SelectionScrollDirection::Down, distance_from_pane);
+            for _ in 0..lines_to_scroll {
+                self.grid.scroll_down_one_line();
+            }
             self.selection_scrolled_at = time::Instant::now();
             self.set_should_render(true);
         } else if cursor_in_the_middle {
             // here we'll only render if the selection was updated, and that'll be handled by the
             // grid
+            self.reset_selection_scroll_acceleration();
             self.grid.update_selection(to);
         }
     }
 
     fn end_selection(&mut self, end: &Position, _client_id: ClientId) {
         self.grid.end_selection(end);
+        self.reset_selection_scroll_acceleration();
         self.set_should_render(true);
     }
 
     fn reset_selection(&mut self, _client_id: Option<ClientId>) {
         self.grid.reset_selection();
+        self.reset_selection_scroll_acceleration();
     }
 
     fn get_selected_text(&self, _client_id: ClientId) -> Option<String> {
@@ -1138,6 +1159,8 @@ impl TerminalPane {
             active_at: Instant::now(),
             style,
             selection_scrolled_at: time::Instant::now(),
+            selection_scroll_direction: None,
+            selection_scroll_started_at: None,
             pane_title: initial_pane_title,
             pane_name: pane_name.clone(),
             prev_pane_name: pane_name,
@@ -1156,6 +1179,31 @@ impl TerminalPane {
             pending_pty_input: VecDeque::new(),
         }
     }
+
+    fn selection_scroll_lines(
+        &mut self,
+        direction: SelectionScrollDirection,
+        distance_from_pane: usize,
+    ) -> usize {
+        let now = time::Instant::now();
+        if self.selection_scroll_direction != Some(direction) {
+            self.selection_scroll_direction = Some(direction);
+            self.selection_scroll_started_at = Some(now);
+        }
+        let distance_lines = selection_scroll_lines_for_distance(distance_from_pane);
+        let elapsed = self
+            .selection_scroll_started_at
+            .map(|started_at| started_at.elapsed())
+            .unwrap_or_default();
+        let time_lines = selection_scroll_lines_for_elapsed(elapsed);
+        distance_lines.max(time_lines)
+    }
+
+    fn reset_selection_scroll_acceleration(&mut self) {
+        self.selection_scroll_direction = None;
+        self.selection_scroll_started_at = None;
+    }
+
     pub fn get_x(&self) -> usize {
         match self.geom_override {
             Some(position_and_size_override) => position_and_size_override.x,
@@ -1344,6 +1392,24 @@ impl TerminalPane {
             self.remove_banner();
             AdjustedInput::DropToShellInThisPane { working_dir }
         })
+    }
+}
+
+fn selection_scroll_lines_for_distance(distance_from_pane: usize) -> usize {
+    match distance_from_pane {
+        0..=2 => 1,
+        3..=5 => 2,
+        6..=9 => 4,
+        _ => MAX_SELECTION_SCROLL_LINES_PER_TICK,
+    }
+}
+
+fn selection_scroll_lines_for_elapsed(elapsed: time::Duration) -> usize {
+    match elapsed.as_millis() {
+        0..=299 => 1,
+        300..=699 => 2,
+        700..=1199 => 4,
+        _ => MAX_SELECTION_SCROLL_LINES_PER_TICK,
     }
 }
 
